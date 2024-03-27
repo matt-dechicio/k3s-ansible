@@ -113,7 +113,7 @@
 
         - name: Change server address in kubeconfig on control node
           ansible.builtin.shell: |
-            KUBECONFIG={{ kubeconfig }} kubectl config set-cluster default --server=https://{{ api_endpoint }}:{{ api_port }}
+            KUBECONFIG={{ kubeconfig }} kubectl config set-cluster default --server=https://{{ vip }}:{{ api_port }}
           delegate_to: 127.0.0.1
           become: false
           register: csa_result

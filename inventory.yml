@@ -1,0 +1,43 @@
+---
+k3s_cluster:
+  children:
+    server:
+      hosts:
+        mushroom:
+        blue:
+        node:
+#    agent:
+#      hosts:
+
+  # Required Vars
+  vars:
+    ansible_port: 22
+    kubeconfig: ~/.kube/config
+    ansible_user: matt
+    vip: kube-vip
+    k3s_version: v1.29.2+k3s1
+    token: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          30633464313164646165333130643562326630323930623337326430383766656363333332653430
+          3762323231306133343265633538366238623664656437320a396531643230373932376335653766
+          39373832313766313463616161306538663434303238663263343364383736666664636436306636
+          3034663332336337320a626637363439373831353964323632323564363034396331336265313033
+          6434
+    api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
+    extra_server_args: "--tls-san={{ vip }} --disable=traefik --disable=servicelb"
+    extra_agent_args: ""
+
+  # Optional vars
+    # api_port: 6443
+    # k3s_server_location: /var/lib/rancher/k3s
+    # systemd_dir: /etc/systemd/system
+    # extra_service_envs: [ 'ENV_VAR1=VALUE1', 'ENV_VAR2=VALUE2' ]
+    # Manifests or Airgap should be either full paths or relative to the playbook directory.
+    # List of locally available manifests to apply to the cluster, useful for PVCs or Traefik modifications.
+    extra_manifests: [ 'kube-vip.yaml','kube-vip-cloud-controller.yaml' ]
+    # airgap_dir: /tmp/k3s-airgap-images
+    # user_kubectl: true, by default kubectl is symlinked and configured for use by ansible_user. Set to false to only kubectl via root user.
+    # server_config_yaml:  |
+      # This is now an inner yaml file. Maintain the indentation.
+      # YAML here will be placed as the content of /etc/rancher/k3s/config.yaml
+      # See https://docs.k3s.io/installation/configuration#configuration-file

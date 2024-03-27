@@ -1,0 +1,137 @@
+---
+- hosts: 127.0.0.1 
+  vars:
+    - argocd_version: v2.10.4
+    - argocd_namespace: argocd
+    - argocd_domain: argocd.k3s.com
+    - argocd_cli_path: /usr/local/bin/argocd
+    - argocd_admin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          36393663613139383861373239333964636533643163366237316365346234313234376264323835
+          6235346363383839343831633561316665636265346435320a313931653265616165633436393636
+          61653938313634623830626463396339373632336266326264653364356234623964313632646137
+          6261363330333539350a316363333437303239323839333233316562666563303434326131333261
+          3938
+  tasks:
+    - name: Create argocd namespace
+      k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ argocd_namespace }}"
+
+    - name: check if ArgoCD is installed already
+      set_fact:
+        argocd_installed: "{{ query('kubernetes.core.k8s', kind='Service', namespace='argocd', resource_name='argocd-server') }}"
+
+    - name: list output
+      debug:
+        msg: "{{ argocd_installed }}"
+      when: debug is defined
+
+    - name: Install ArgoCD manifest from URL
+      block:
+        - name: Download ArgoCD install
+          get_url:
+            url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+            dest: /tmp/argocd_install.yaml
+
+        - name: Apply ArcgoCD manifest
+          k8s:
+            namespace: "{{ argocd_namespace }}"
+            src: /tmp/argocd_install.yaml
+    
+        - name: Delete temp ArgoCD install file
+          file:
+            path: /tmp/argocd_install.yaml
+            state: absent
+      when: argocd_installed | length == 0
+        
+    - name: Patch ArgoCD service with load balancer
+      kubernetes.core.k8s_json_patch:
+        kind: svc
+        namespace: "{{ argocd_namespace }}"
+        name: argocd-server
+        patch:
+          - op: replace
+            path: /spec/type
+            value: LoadBalancer
+        
+    - name: Patch ArgoCD service with hostname 
+      kubernetes.core.k8s_json_patch:
+        kind: svc
+        namespace: "{{ argocd_namespace }}"
+        name: argocd-server
+        patch:
+          - op: add
+            path: /metadata/annotations/coredns.io~1hostname
+            value: argocd5.k3s.com
+
+    - name: Get ArgoCD IP
+      set_fact:
+        argocd_ip: "{{ query('kubernetes.core.k8s', kind='Service', namespace=argocd_namespace, resource_name='argocd-server') | community.general.json_query('[0].spec.loadBalancerIP') }}"
+      
+    - name: DEBUG Argo IP
+      debug:
+        var: argocd_ip
+      when: debug is defined
+      
+    - name: Wait for ArgoCD to start
+      wait_for:
+        host: "{{ argocd_ip }}"
+        port: 443
+
+    - name: Make sure /usr/local/bin exist
+      file:
+        path: /usr/local/bin
+        state: directory
+        owner: root
+        group: wheel
+        mode: '0755'
+      become: yes
+
+
+    - name: Download ArgoCD commandline tool for macos to /usr/local/bin
+      get_url:
+        url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_version }}/argocd-darwin-arm64"
+        dest: "{{ argocd_cli_path }}"
+        owner: root
+        group: wheel
+        mode: '0755'
+      become: yes
+
+    - name: Get json for ArgoCD initial secret
+      set_fact:
+        argocd_initial_pass_json: "{{ query('kubernetes.core.k8s', kind='Secret', namespace=argocd_namespace, resource_name='argocd-initial-admin-secret') }}"
+
+    - name: DEBUG json for ArgoCD initial password
+      debug:
+        var: argocd_initial_pass_json 
+      when: debug is defined
+
+    - name: Parse initial ArgoCD password
+      set_fact:
+        argocd_initial_pass: "{{ argocd_initial_pass_json | community.general.json_query('[0].data.password') | b64decode }}"
+      when: argocd_initial_pass_json | length > 0 
+ 
+    - name: DEBUG ArgoCD initial password
+      debug:
+        var: argocd_initial_pass
+      when: debug is defined
+
+    - name: Set new ArgoCD password if initial password set
+      block:
+        - name: Login to ArgoCD commandline
+          shell: argocd login {{ argocd_ip }}:443 --username admin --password {{ argocd_initial_pass }} --insecure
+
+        - name: Change initial ArgoCD password
+          shell: argocd account update-password --account admin --current-password {{ argocd_initial_pass }} --new-password {{ argocd_admin_password }} --insecure
+          no_log: true
+
+        - name: remove argocd initial password secret
+          k8s:
+            api_version: v1
+            kind: Secret
+            name: argocd-initial-admin-secret
+            namespace: "{{ argocd_namespace }}"
+            state: absent
+      when: argocd_initial_pass_json | length > 0 
