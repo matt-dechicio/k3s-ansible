@@ -202,7 +202,7 @@
         mode: 0700
         state: directory
     - name: Copy manifests
-      ansible.builtin.copy:
+      ansible.builtin.template:
         src: "{{ item }}"
         dest: "/var/lib/rancher/k3s/server/manifests"
         mode: 0600

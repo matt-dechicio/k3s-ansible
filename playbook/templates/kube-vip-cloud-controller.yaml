@@ -93,4 +93,4 @@ metadata:
   name: kubevip
   namespace: kube-system
 data:
-  range-global: 192.168.7.101-192.168.7.110
+  range-global: "{{ loadbalancer_dhcp_range }}" 

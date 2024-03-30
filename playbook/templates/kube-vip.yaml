@@ -103,7 +103,7 @@ spec:
         - name: vip_retryperiod
           value: "1"
         - name: address
-          value: kube-vip
+          value: "{{ vip }}"
         - name: prometheus_server
           value: :2112
         image: ghcr.io/kube-vip/kube-vip:v0.7.1

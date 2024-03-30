@@ -1,4 +1,5 @@
 ---
+# K3S
 k3s_cluster:
   children:
     server:
@@ -9,12 +10,10 @@ k3s_cluster:
 #    agent:
 #      hosts:
 
-  # Required Vars
   vars:
     ansible_port: 22
     kubeconfig: ~/.kube/config
     ansible_user: matt
-    vip: kube-vip
     k3s_version: v1.29.2+k3s1
     token: !vault |
           $ANSIBLE_VAULT;1.1;AES256
@@ -34,6 +33,7 @@ k3s_cluster:
     # extra_service_envs: [ 'ENV_VAR1=VALUE1', 'ENV_VAR2=VALUE2' ]
     # Manifests or Airgap should be either full paths or relative to the playbook directory.
     # List of locally available manifests to apply to the cluster, useful for PVCs or Traefik modifications.
+    # Put extra manifests into playbooks/templates/
     extra_manifests: [ 'kube-vip.yaml','kube-vip-cloud-controller.yaml' ]
     # airgap_dir: /tmp/k3s-airgap-images
     # user_kubectl: true, by default kubectl is symlinked and configured for use by ansible_user. Set to false to only kubectl via root user.
@@ -41,3 +41,27 @@ k3s_cluster:
       # This is now an inner yaml file. Maintain the indentation.
       # YAML here will be placed as the content of /etc/rancher/k3s/config.yaml
       # See https://docs.k3s.io/installation/configuration#configuration-file
+
+  # Kube-vip
+    vip: kube-vip
+    loadbalancer_dhcp_range: 192.168.7.101-192.168.7.110
+
+# ArgoCD
+argocd:
+  hosts:
+    localhost: 
+  vars:
+    ansible_connection: local
+    ansible_python_interpreter: "{{ansible_playbook_python}}"
+    argocd_version: v2.10.4
+    argocd_namespace: argocd
+    argocd_domain: argocd.k3s.com
+    argocd_cli_path: /usr/local/bin/argocd
+    argocd_admin_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          36393663613139383861373239333964636533643163366237316365346234313234376264323835
+          6235346363383839343831633561316665636265346435320a313931653265616165633436393636
+          61653938313634623830626463396339373632336266326264653364356234623964313632646137
+          6261363330333539350a316363333437303239323839333233316562666563303434326131333261
+          3938
+
