@@ -1,0 +1,16 @@
+apiVersion: v1
+data:
+  name: cmVwby1hdmF0YXItYXBwcw==
+  project: ZGVmYXVsdA==
+  sshPrivateKey: "{{argocd_private_repo_ssh_key}}"
+  type: Z2l0
+  url: "{{argocd_private_repo_url}}"
+kind: Secret
+metadata:
+  annotations:
+    managed-by: argocd.argoproj.io
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  name: repo-avatar-apps
+  namespace: argocd
+type: Opaque

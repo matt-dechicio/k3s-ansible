@@ -15,16 +15,11 @@ k3s_cluster:
     kubeconfig: ~/.kube/config
     ansible_user: matt
     k3s_version: v1.29.2+k3s1
-    token: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          30633464313164646165333130643562326630323930623337326430383766656363333332653430
-          3762323231306133343265633538366238623664656437320a396531643230373932376335653766
-          39373832313766313463616161306538663434303238663263343364383736666664636436306636
-          3034663332336337320a626637363439373831353964323632323564363034396331336265313033
-          6434
+    token: "{{vault_token}}"
     api_endpoint: "{{ hostvars[groups['server'][0]]['ansible_host'] | default(groups['server'][0]) }}"
     extra_server_args: "--tls-san={{ vip }} --disable=traefik --disable=servicelb"
     extra_agent_args: ""
+    extra_manifests: [ 'kube-vip.yaml','kube-vip-cloud-controller.yaml' ]
 
   # Optional vars
     # api_port: 6443
@@ -34,7 +29,6 @@ k3s_cluster:
     # Manifests or Airgap should be either full paths or relative to the playbook directory.
     # List of locally available manifests to apply to the cluster, useful for PVCs or Traefik modifications.
     # Put extra manifests into playbooks/templates/
-    extra_manifests: [ 'kube-vip.yaml','kube-vip-cloud-controller.yaml' ]
     # airgap_dir: /tmp/k3s-airgap-images
     # user_kubectl: true, by default kubectl is symlinked and configured for use by ansible_user. Set to false to only kubectl via root user.
     # server_config_yaml:  |
@@ -43,7 +37,7 @@ k3s_cluster:
       # See https://docs.k3s.io/installation/configuration#configuration-file
 
   # Kube-vip
-    vip: kube-vip
+    vip: avatar
     loadbalancer_dhcp_range: 192.168.7.101-192.168.7.110
 
 # ArgoCD
@@ -52,16 +46,14 @@ argocd:
     localhost: 
   vars:
     ansible_connection: local
-    ansible_python_interpreter: "{{ansible_playbook_python}}"
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
     argocd_version: v2.10.4
     argocd_namespace: argocd
     argocd_domain: argocd.k3s.com
     argocd_cli_path: /usr/local/bin/argocd
-    argocd_admin_password: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          36393663613139383861373239333964636533643163366237316365346234313234376264323835
-          6235346363383839343831633561316665636265346435320a313931653265616165633436393636
-          61653938313634623830626463396339373632336266326264653364356234623964313632646137
-          6261363330333539350a316363333437303239323839333233316562666563303434326131333261
-          3938
-
+    argocd_cli_arch: argocd-darwin-arm64
+    argocd_admin_password: "{{ vault_argocd_admin_password }}"
+    argocd_private_repo_url: "{{ vault_argocd_private_repo_url | b64encode }}" 
+    argocd_private_repo_ssh_key: "{{ vault_argocd_private_repo_ssh_key | b64encode }}"
+    argocd_app_of_apps_repo_url: "{{ vault_argocd_private_repo_url }}"
+    argocd_domain: k3s.com 

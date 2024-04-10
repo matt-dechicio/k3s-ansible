@@ -11,7 +11,7 @@
       set_fact:
         argocd_installed: "{{ query('kubernetes.core.k8s', kind='Service', namespace='argocd', resource_name='argocd-server') }}"
 
-    - name: list output
+    - name: Debug output of ArgoCD installation check
       debug:
         msg: "{{ argocd_installed }}"
       when: debug is defined
@@ -52,13 +52,13 @@
         patch:
           - op: add
             path: /metadata/annotations/coredns.io~1hostname
-            value: argocd5.k3s.com
+            value: argocd.{{ argocd_domain }}
 
     - name: Get ArgoCD IP
       set_fact:
         argocd_ip: "{{ query('kubernetes.core.k8s', kind='Service', namespace=argocd_namespace, resource_name='argocd-server') | community.general.json_query('[0].spec.loadBalancerIP') }}"
       
-    - name: DEBUG Argo IP
+    - name: DEBUG display Argo IP
       debug:
         var: argocd_ip
       when: debug is defined
@@ -80,7 +80,7 @@
 
     - name: Download ArgoCD commandline tool for macos to /usr/local/bin
       get_url:
-        url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_version }}/argocd-darwin-arm64"
+        url: "https://github.com/argoproj/argo-cd/releases/download/{{ argocd_version }}/{{ argocd_cli_arch }}"
         dest: "{{ argocd_cli_path }}"
         owner: root
         group: wheel
@@ -123,3 +123,19 @@
             namespace: "{{ argocd_namespace }}"
             state: absent
       when: argocd_initial_pass_json | length > 0 
+
+    - name: Create ArgoCD secret for private repo
+      kubernetes.core.k8s:
+        state: present
+        template: 'argocd_private_repo.j2'
+      no_log: true
+
+    - name: Get status of ArgoCD app of apps install
+      set_fact:
+        argocd_status_app_of_apps: "{{ query('kubernetes.core.k8s', api_version='argoproj.io/v1alpha1', kind='Application', namespace=argocd_namespace, resource_name='app-of-apps') }}"
+
+    - name: Create ArgoCD app of apps
+      kubernetes.core.k8s:
+        state: present
+        template: 'argocd_app-of-apps.j2'
+      when: argocd_status_app_of_apps | length < 1
