@@ -54,6 +54,15 @@
             path: /metadata/annotations/coredns.io~1hostname
             value: argocd.{{ argocd_domain }}
 
+    - name: Patch ArgoCD to allow syncwaves between apps
+      kubernetes.core.k8s:
+        state: patched
+        kind: ConfigMap
+        name: argocd-cm
+        namespace: "{{ argocd_namespace }}"
+        definition: "{{ lookup('file', 'argocd-syncwave.yml') | from_yaml }}"
+
+
     - name: Get ArgoCD IP
       set_fact:
         argocd_ip: "{{ query('kubernetes.core.k8s', kind='Service', namespace=argocd_namespace, resource_name='argocd-server') | community.general.json_query('[0].spec.loadBalancerIP') }}"
